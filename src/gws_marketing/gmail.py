@@ -7,6 +7,7 @@ outbound message human-reviewed.
 from __future__ import annotations
 
 import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.message import EmailMessage
 from typing import Any
 
@@ -35,6 +36,25 @@ class GmailRestClient:
     def _headers_to_dict(headers: list[dict[str, Any]]) -> dict[str, str]:
         return {h["name"]: h["value"] for h in headers or [] if h.get("name") in _HEADER_NAMES}
 
+    def _fetch_message_metadata(self, message_id: str) -> dict[str, Any]:
+        detail = self._check(
+            self._session.get(
+                f"{BASE}/messages/{message_id}",
+                params={"format": "metadata", "metadataHeaders": list(_HEADER_NAMES)},
+            ),
+            "messages.get",
+        )
+        headers = self._headers_to_dict(detail.get("payload", {}).get("headers", []))
+        return {
+            "id": detail.get("id"),
+            "thread_id": detail.get("threadId"),
+            "from": headers.get("From"),
+            "subject": headers.get("Subject"),
+            "date": headers.get("Date"),
+            "snippet": detail.get("snippet"),
+            "labels": detail.get("labelIds", []),
+        }
+
     def search_messages(self, query: str | None = None, max_results: int = 10) -> list[dict[str, Any]]:
         """Search the mailbox and return compact metadata rows."""
         params: dict[str, Any] = {"maxResults": max_results}
@@ -43,27 +63,23 @@ class GmailRestClient:
         response = self._session.get(f"{BASE}/messages", params=params)
         payload = self._check(response, "messages.list")
 
+        stubs = payload.get("messages", [])
+        if not stubs:
+            return []
+
+        # Gmail list only returns ids; metadata requires per-message GETs.
+        # Fetch in parallel to cut wall-clock latency on multi-result searches.
+        by_id: dict[str, dict[str, Any]] = {}
+        with ThreadPoolExecutor(max_workers=min(len(stubs), 8)) as pool:
+            futures = {
+                pool.submit(self._fetch_message_metadata, stub["id"]): stub["id"]
+                for stub in stubs
+            }
+            for future in as_completed(futures):
+                by_id[futures[future]] = future.result()
         results: list[dict[str, Any]] = []
-        for stub in payload.get("messages", []):
-            detail = self._check(
-                self._session.get(
-                    f"{BASE}/messages/{stub['id']}",
-                    params={"format": "metadata", "metadataHeaders": list(_HEADER_NAMES)},
-                ),
-                "messages.get",
-            )
-            headers = self._headers_to_dict(detail.get("payload", {}).get("headers", []))
-            results.append(
-                {
-                    "id": detail.get("id"),
-                    "thread_id": detail.get("threadId"),
-                    "from": headers.get("From"),
-                    "subject": headers.get("Subject"),
-                    "date": headers.get("Date"),
-                    "snippet": detail.get("snippet"),
-                    "labels": detail.get("labelIds", []),
-                }
-            )
+        for stub in stubs:
+            results.append(by_id[stub["id"]])
         return results
 
     def get_message(self, message_id: str) -> dict[str, Any]:

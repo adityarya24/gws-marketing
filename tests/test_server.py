@@ -28,11 +28,35 @@ def test_build_tool_definitions_matches_registry():
     assert "analytics.readonly" not in json.dumps(by_name["ga4_run_report"].inputSchema)
 
 
-def test_handle_call_unknown_tool_raises():
-    import asyncio
+def test_handle_call_unknown_tool_returns_error_json():
+    result = asyncio_run(srv.handle_call("nope", {}))
+    assert len(result) == 1
+    payload = json.loads(result[0].text)
+    assert payload["type"] == "unknown_tool"
+    assert "nope" in payload["error"]
 
-    with pytest.raises(ValueError, match="Unknown"):
-        asyncio.run(srv.handle_call("nope", {}))
+
+def test_handle_call_returns_validation_error_json(monkeypatch):
+    from tests.test_tools import FakeGscClient
+
+    monkeypatch.setattr(srv, "get_client", lambda name, account="default": FakeGscClient())
+    result = asyncio_run(
+        srv.handle_call(
+            "gsc_search_analytics",
+            {"site_url": "x", "start_date": "bad", "end_date": "2026-08-23"},
+        )
+    )
+    payload = json.loads(result[0].text)
+    assert payload["type"] == "validation_error"
+    assert payload["tool"] == "gsc_search_analytics"
+
+
+def test_handle_call_returns_runtime_error_json(monkeypatch):
+    monkeypatch.setattr(srv, "load_credentials", lambda account="default": None)
+    result = asyncio_run(srv.handle_call("gsc_list_sites", {}))
+    payload = json.loads(result[0].text)
+    assert payload["type"] == "runtime_error"
+    assert "No stored Google credentials" in payload["error"]
 
 
 def test_handle_call_dispatches_with_injected_client(monkeypatch):

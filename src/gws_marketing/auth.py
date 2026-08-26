@@ -106,20 +106,26 @@ def default_groups() -> list[str]:
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
-def login(profile: str = "default", groups: list[str] | None = None) -> str:
+def login(profile: str = "default", groups: list[str] | None = None) -> dict[str, Any]:
     """Run the installed-app OAuth flow and persist refreshable tokens.
 
     Only the requested groups are asked for. The default is the marketing core
     (search + analytics); Gmail, Calendar and Drive are opt-in, so nobody hands
     over their whole mailbox to read Search Console numbers.
+
+    Returns a dict with ``ok`` (bool) and ``message`` (str) so callers can
+    distinguish a missing client secret from a successful consent flow.
     """
     secret = client_secret_path()
     if secret is None or not secret.exists():
-        return (
-            "No OAuth client secret found. Set GWS_CLIENT_SECRET_FILE to the "
-            "downloaded desktop client_secret.json from your GCP project, "
-            "then retry."
-        )
+        return {
+            "ok": False,
+            "message": (
+                "No OAuth client secret found. Set GWS_CLIENT_SECRET_FILE to the "
+                "downloaded desktop client_secret.json from your GCP project, "
+                "then retry."
+            ),
+        }
 
     # Imported lazily so tooling/tests never require these libs.
     from google.auth.transport.requests import Request
@@ -150,10 +156,13 @@ def login(profile: str = "default", groups: list[str] | None = None) -> str:
             f" Granted restricted scope group(s): {', '.join(restricted)} —"
             " these give broad access, so revoke with auth_logout when done."
         )
-    return (
-        f"Saved tokens for account '{profile}' to {tokens_path(profile)}."
-        f" Scope groups: {', '.join(requested)}.{note}"
-    )
+    return {
+        "ok": True,
+        "message": (
+            f"Saved tokens for account '{profile}' to {tokens_path(profile)}."
+            f" Scope groups: {', '.join(requested)}.{note}"
+        ),
+    }
 
 
 def load_credentials(profile: str = "default") -> Any:
@@ -184,7 +193,9 @@ def logout(profile: str = "default") -> str:
 
 
 def main() -> None:
-    print(login())
+    result = login()
+    print(result["message"])
+    raise SystemExit(0 if result["ok"] else 1)
 
 
 if __name__ == "__main__":

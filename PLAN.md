@@ -5,14 +5,14 @@ Workspace** (Gmail/Calendar/Drive), so any coding agent can query real
 marketing/workspace data and produce human-reviewed drafts over stdio MCP,
 with the OAuth flow built into the server itself.
 
-## Status (v0.2.0)
+## Status (v0.2.1)
 
 - GSC reads: sites, search analytics, sitemaps, URL inspection (4 tools)
 - GA4 reports: account/property listing, run_report (2 tools)
 - Workspace: Gmail search/get/draft-only, Calendar list/events, Drive search (6 tools)
 - Built-in auth: auth_status / auth_login / auth_logout with multi-account
   token profiles (3 tools)
-- 31 mocked tests green; every surface live-smoked against real accounts.
+- 43 mocked tests green; every surface live-smoked against real accounts.
 
 ## Roadmap
 

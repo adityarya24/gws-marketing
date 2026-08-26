@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gws-marketing"
-version = "0.2.0"
-description = "Agent-facing MCP server for Google Search Console, GA4, and Workspace (Gmail drafts, Calendar, Drive) with built-in multi-account OAuth"
+version = "0.2.1"
+description = "Agent-facing MCP server for Google Search Console, GA4, and Workspace with scoped OAuth"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

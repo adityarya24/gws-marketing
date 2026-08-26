@@ -16,6 +16,7 @@ from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 
 from . import __version__
+from .auth import granted_groups, load_credentials
 from .drive import DriveRestClient
 from .ga4 import Ga4RestClient
 from .gcal import GcalRestClient
@@ -28,10 +29,6 @@ SERVER_NAME = "gws-marketing"
 
 def get_client(tool_name: str, account: str = "default") -> Any:
     """Resolve the right client lazily so imports never require OAuth state."""
-    from .auth import load_credentials
-
-    from .auth import granted_groups
-
     credentials = load_credentials(account)
     if credentials is None:
         raise RuntimeError(
@@ -68,21 +65,30 @@ def build_tool_definitions() -> list[types.Tool]:
 
 
 async def handle_call(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
+    import json
+
     try:
         handler = TOOLS[name]
     except KeyError as exc:
-        raise ValueError(f"Unknown gws-marketing tool: {name}") from exc
+        payload = {"error": f"Unknown gws-marketing tool: {name}", "type": "unknown_tool"}
+        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
 
-    # Auth handlers manage local token storage and need no API client.
-    if name.startswith("auth_"):
-        client = None
-    else:
-        account = str(arguments.get("account") or "default")
-        client = get_client(name, account)
-    # Run handlers in a worker thread: auth_login may block for minutes while
-    # the user consents in the browser, and the loop must stay responsive.
-    result = await asyncio.to_thread(handler, client, **(arguments or {}))
-    import json
+    try:
+        # Auth handlers manage local token storage and need no API client.
+        if name.startswith("auth_"):
+            client = None
+        else:
+            account = str(arguments.get("account") or "default")
+            client = get_client(name, account)
+        # Run handlers in a worker thread: auth_login may block for minutes while
+        # the user consents in the browser, and the loop must stay responsive.
+        result = await asyncio.to_thread(handler, client, **(arguments or {}))
+    except ValueError as exc:
+        payload = {"error": str(exc), "type": "validation_error", "tool": name}
+        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
+    except RuntimeError as exc:
+        payload = {"error": str(exc), "type": "runtime_error", "tool": name}
+        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
 
     return [types.TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
 

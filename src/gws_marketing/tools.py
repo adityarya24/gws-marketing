@@ -197,12 +197,12 @@ def handle_auth_login(_client: Any, **kwargs: Any) -> dict[str, Any]:
     if raw is not None and not isinstance(raw, list):
         raise ValueError("scopes must be a list of group names.")
     groups = [str(item) for item in raw] if raw else None
-    message = auth.login(account, groups)
+    login_result = auth.login(account, groups)
     return {
-        "status": "ok",
+        "status": "ok" if login_result["ok"] else "error",
         "account": account,
         "groups": groups or auth.default_groups(),
-        "message": message,
+        "message": login_result["message"],
     }
 
 

@@ -239,7 +239,7 @@ def test_auth_login_passes_profile(monkeypatch):
     def fake_login(profile, groups=None):
         seen["profile"] = profile
         seen["groups"] = groups
-        return "ok"
+        return {"ok": True, "message": "ok"}
 
     monkeypatch.setattr(auth, "login", fake_login)
     out = handle_auth_login(None, account="support")
@@ -260,7 +260,7 @@ def test_auth_login_defaults_exclude_restricted_scopes(monkeypatch):
 
     def fake_login(profile, groups=None):
         seen["groups"] = groups
-        return "ok"
+        return {"ok": True, "message": "ok"}
 
     monkeypatch.setattr(auth, "login", fake_login)
     monkeypatch.delenv("GWS_SCOPES", raising=False)
@@ -278,7 +278,7 @@ def test_auth_login_forwards_requested_groups(monkeypatch):
 
     def fake_login(profile, groups=None):
         seen["groups"] = groups
-        return "ok"
+        return {"ok": True, "message": "ok"}
 
     monkeypatch.setattr(auth, "login", fake_login)
     out = handle_auth_login(None, scopes=["search", "gmail"])
@@ -286,12 +286,36 @@ def test_auth_login_forwards_requested_groups(monkeypatch):
     assert out["groups"] == ["search", "gmail"]
 
 
-def test_auth_login_rejects_non_list_scopes():
+def test_auth_login_rejects_non_list_scopes(monkeypatch):
+    import gws_marketing.auth as auth
+
+    monkeypatch.setattr(
+        auth,
+        "login",
+        lambda profile, groups=None: {"ok": True, "message": "ok"},
+    )
     with pytest.raises(ValueError, match="scopes must be a list"):
         handle_auth_login(None, scopes="gmail")
 
     default_out = handle_auth_login(None)
     assert default_out["account"] == "default"
+    assert default_out["status"] == "ok"
+
+
+def test_auth_login_reports_error_when_client_secret_missing(monkeypatch):
+    import gws_marketing.auth as auth
+
+    monkeypatch.setattr(
+        auth,
+        "login",
+        lambda profile, groups=None: {
+            "ok": False,
+            "message": "No OAuth client secret found.",
+        },
+    )
+    out = handle_auth_login(None)
+    assert out["status"] == "error"
+    assert "client secret" in out["message"]
 
 
 def test_auth_logout_passes_profile(monkeypatch):
@@ -376,6 +400,13 @@ def test_drive_search_bounds():
     assert out["files"][0]["name"] == "Report.pdf"
     with pytest.raises(ValueError, match="max_results"):
         handle_drive_search_files(FakeDriveClient(), max_results=0)
+
+
+def test_drive_escape_query_literals():
+    from gws_marketing.drive import _escape_drive_query_literal
+
+    assert _escape_drive_query_literal("O'Brien") == "O\\'Brien"
+    assert _escape_drive_query_literal(r"a\b") == r"a\\b"
 
 
 def test_resolve_scopes_defaults_and_rejects_unknown():

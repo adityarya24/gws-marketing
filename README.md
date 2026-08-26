@@ -109,6 +109,26 @@ Run the server:
 Register in an MCP client config as a stdio server pointing at the venv's
 `gws-marketing-server` executable.
 
+### Cursor / Claude Desktop / Codex (stdio MCP)
+
+Point the client at the venv executable. Adjust the path to your clone:
+
+```json
+{
+  "mcpServers": {
+    "gws-marketing": {
+      "command": "C:\\Users\\YOU\\gws-marketing\\.venv\\Scripts\\gws-marketing-server.exe",
+      "args": []
+    }
+  }
+}
+```
+
+On macOS/Linux, use `.venv/bin/gws-marketing-server` instead.
+
+First run from the agent: call `auth_status`, then `auth_login` with only the
+scope groups you need (default is `search` + `analytics`).
+
 ## Roadmap
 
 See `PLAN.md`. Shipped so far: GSC reads, GA4 reports, built-in auth tools,

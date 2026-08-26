@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 # NOTE: www.googleapis.com is the canonical host that reliably serves
 # Calendar v3; calendar.googleapis.com intermittently returns HTML 404s.
@@ -57,8 +58,9 @@ class GcalRestClient:
             params["timeMax"] = time_max
         if query:
             params["q"] = query
+        encoded_id = quote(calendar_id, safe="")
         response = self._session.get(
-            f"{BASE}/calendars/{calendar_id}/events", params=params
+            f"{BASE}/calendars/{encoded_id}/events", params=params
         )
         payload = self._check(response, "events.list")
         events: list[dict[str, Any]] = []

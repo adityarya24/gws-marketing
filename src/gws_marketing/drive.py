@@ -8,6 +8,11 @@ BASE = "https://www.googleapis.com/drive/v3"
 _FILE_FIELDS = "files(id,name,mimeType,modifiedTime,size,webViewLink)"
 
 
+def _escape_drive_query_literal(value: str) -> str:
+    """Escape a user string for Drive query single-quoted literals."""
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
 class DriveRestClient:
     def __init__(self, session: Any) -> None:
         self._session = session
@@ -32,7 +37,7 @@ class DriveRestClient:
         """List files (most recently modified first), optionally name-filtered."""
         clauses = ["trashed = false"]
         if query:
-            safe = query.replace("'", "\\'")
+            safe = _escape_drive_query_literal(query)
             clauses.append(f"(name contains '{safe}' or fullText contains '{safe}')")
         params: dict[str, Any] = {
             "q": " and ".join(clauses),
