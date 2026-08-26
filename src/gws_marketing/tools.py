@@ -173,9 +173,19 @@ def handle_ga4_run_report(client: Any, **kwargs: Any) -> dict[str, Any]:
 
 def handle_auth_status(_client: Any, **_kwargs: Any) -> dict[str, Any]:
     from . import auth
+    from .gsc import SCOPE_GROUPS, groups_for_scopes
 
     profiles = auth.list_profiles()
-    return {"profiles": profiles, "count": len(profiles)}
+    # Say which groups each profile actually holds, so a caller can see why a
+    # tool is refusing before it refuses.
+    for profile in profiles:
+        profile["groups"] = groups_for_scopes(profile.get("scopes"))
+    return {
+        "profiles": profiles,
+        "count": len(profiles),
+        "available_groups": sorted(SCOPE_GROUPS),
+        "default_groups": auth.default_groups(),
+    }
 
 
 def handle_auth_login(_client: Any, **kwargs: Any) -> dict[str, Any]:
@@ -183,8 +193,17 @@ def handle_auth_login(_client: Any, **kwargs: Any) -> dict[str, Any]:
     from . import auth
 
     account = str(kwargs.get("account") or "default")
-    message = auth.login(account)
-    return {"status": "ok", "account": account, "message": message}
+    raw = kwargs.get("scopes")
+    if raw is not None and not isinstance(raw, list):
+        raise ValueError("scopes must be a list of group names.")
+    groups = [str(item) for item in raw] if raw else None
+    message = auth.login(account, groups)
+    return {
+        "status": "ok",
+        "account": account,
+        "groups": groups or auth.default_groups(),
+        "message": message,
+    }
 
 
 def handle_auth_logout(_client: Any, **kwargs: Any) -> dict[str, Any]:
@@ -393,6 +412,17 @@ SCHEMAS: dict[str, dict[str, Any]] = {
                 "description": "Optional token profile name (default: 'default'). "
                 "Use a distinct name per Google account, e.g. 'support'.",
             },
+            "scopes": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": ["search", "analytics", "gmail", "calendar", "drive"],
+                },
+                "description": "Scope groups to request. Defaults to "
+                "['search', 'analytics'] — the marketing core. 'gmail' and "
+                "'drive' are restricted scopes granting broad access to the "
+                "whole mailbox or drive; only add them if a tool needs them.",
+            },
         },
         "additionalProperties": False,
     },
@@ -493,7 +523,9 @@ DESCRIPTIONS: dict[str, str] = {
         "Start Google OAuth consent for this machine: opens the browser and "
         "returns once the user finishes consenting. Tokens are stored locally "
         "under the given account profile. Requires an OAuth client secret on "
-        "this machine."
+        "this machine. Only the requested scope groups are asked for — the "
+        "default is search + analytics, so Gmail and Drive are never granted "
+        "unless explicitly named."
     ),
     "auth_logout": "Delete a stored Google token profile from this machine.",
     "gmail_search_messages": (

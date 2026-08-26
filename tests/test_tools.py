@@ -235,13 +235,60 @@ def test_auth_login_passes_profile(monkeypatch):
     import gws_marketing.auth as auth
 
     seen = {}
-    monkeypatch.setattr(
-        auth, "login", lambda profile: seen.setdefault("profile", profile) or "ok"
-    )
+
+    def fake_login(profile, groups=None):
+        seen["profile"] = profile
+        seen["groups"] = groups
+        return "ok"
+
+    monkeypatch.setattr(auth, "login", fake_login)
     out = handle_auth_login(None, account="support")
     assert seen["profile"] == "support"
     assert out["account"] == "support"
     assert out["status"] == "ok"
+
+
+def test_auth_login_defaults_exclude_restricted_scopes(monkeypatch):
+    """The default consent must not reach into Gmail or Drive.
+
+    This is the whole point of grouping scopes: someone reading Search Console
+    numbers should never be asked to hand over their mailbox.
+    """
+    import gws_marketing.auth as auth
+
+    seen = {}
+
+    def fake_login(profile, groups=None):
+        seen["groups"] = groups
+        return "ok"
+
+    monkeypatch.setattr(auth, "login", fake_login)
+    monkeypatch.delenv("GWS_SCOPES", raising=False)
+    out = handle_auth_login(None)
+
+    assert seen["groups"] is None  # auth.login applies the default itself
+    assert out["groups"] == ["search", "analytics"]
+    assert "gmail" not in out["groups"] and "drive" not in out["groups"]
+
+
+def test_auth_login_forwards_requested_groups(monkeypatch):
+    import gws_marketing.auth as auth
+
+    seen = {}
+
+    def fake_login(profile, groups=None):
+        seen["groups"] = groups
+        return "ok"
+
+    monkeypatch.setattr(auth, "login", fake_login)
+    out = handle_auth_login(None, scopes=["search", "gmail"])
+    assert seen["groups"] == ["search", "gmail"]
+    assert out["groups"] == ["search", "gmail"]
+
+
+def test_auth_login_rejects_non_list_scopes():
+    with pytest.raises(ValueError, match="scopes must be a list"):
+        handle_auth_login(None, scopes="gmail")
 
     default_out = handle_auth_login(None)
     assert default_out["account"] == "default"
@@ -329,3 +376,46 @@ def test_drive_search_bounds():
     assert out["files"][0]["name"] == "Report.pdf"
     with pytest.raises(ValueError, match="max_results"):
         handle_drive_search_files(FakeDriveClient(), max_results=0)
+
+
+def test_resolve_scopes_defaults_and_rejects_unknown():
+    from gws_marketing.gsc import DEFAULT_SCOPE_GROUPS, RESTRICTED_GROUPS, resolve_scopes
+
+    default = resolve_scopes()
+    assert default == [
+        "https://www.googleapis.com/auth/webmasters.readonly",
+        "https://www.googleapis.com/auth/analytics.readonly",
+    ]
+    assert not any("gmail" in scope or "drive" in scope for scope in default)
+    assert RESTRICTED_GROUPS == {"gmail", "drive"}
+    assert DEFAULT_SCOPE_GROUPS == ("search", "analytics")
+
+    with pytest.raises(ValueError, match="Unknown scope group"):
+        resolve_scopes(["search", "nope"])
+
+
+def test_groups_for_scopes_reports_only_complete_groups():
+    from gws_marketing.gsc import groups_for_scopes
+
+    # gmail needs both readonly and compose; one alone does not grant the group.
+    partial = groups_for_scopes(["https://www.googleapis.com/auth/gmail.readonly"])
+    assert "gmail" not in partial
+
+    full = groups_for_scopes(
+        [
+            "https://www.googleapis.com/auth/gmail.readonly",
+            "https://www.googleapis.com/auth/gmail.compose",
+        ]
+    )
+    assert full == ["gmail"]
+
+
+def test_group_for_tool_maps_every_tool_family():
+    from gws_marketing.gsc import group_for_tool
+
+    assert group_for_tool("gsc_list_sites") == "search"
+    assert group_for_tool("ga4_run_report") == "analytics"
+    assert group_for_tool("gmail_create_draft") == "gmail"
+    assert group_for_tool("gcal_list_events") == "calendar"
+    assert group_for_tool("drive_search_files") == "drive"
+    assert group_for_tool("auth_status") is None

@@ -20,7 +20,7 @@ from .drive import DriveRestClient
 from .ga4 import Ga4RestClient
 from .gcal import GcalRestClient
 from .gmail import GmailRestClient
-from .gsc import build_client
+from .gsc import build_client, group_for_tool
 from .tools import DESCRIPTIONS, SCHEMAS, TOOLS
 
 SERVER_NAME = "gws-marketing"
@@ -30,11 +30,24 @@ def get_client(tool_name: str, account: str = "default") -> Any:
     """Resolve the right client lazily so imports never require OAuth state."""
     from .auth import load_credentials
 
+    from .auth import granted_groups
+
     credentials = load_credentials(account)
     if credentials is None:
         raise RuntimeError(
             f"No stored Google credentials for account '{account}'. "
             "Call the auth_login tool (or run gws-marketing-login) first."
+        )
+
+    # A tool whose scope group was never consented to fails here with an
+    # actionable message, rather than deep inside a Google API call with an
+    # opaque 403.
+    needed = group_for_tool(tool_name)
+    if needed is not None and needed not in granted_groups(account):
+        raise RuntimeError(
+            f"Account '{account}' has not granted the '{needed}' scope group, "
+            f"which {tool_name} requires. Re-run auth_login with "
+            f"scopes=[\"{needed}\", ...] to add it."
         )
     if tool_name.startswith("gsc_"):
         return build_client(credentials)
