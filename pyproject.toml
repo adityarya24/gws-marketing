@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gws-marketing"
+version = "0.2.0"
+description = "Agent-facing MCP server for Google Search Console, GA4, and Workspace (Gmail drafts, Calendar, Drive) with built-in multi-account OAuth"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Aditya Arya", email = "adityarya24@users.noreply.github.com" }]
+keywords = ["mcp", "seo", "google-search-console", "ga4", "gmail", "calendar", "drive", "workspace", "oauth", "marketing", "agents"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Site Management",
+]
+dependencies = [
+    "mcp>=1.27.0,<2.0",
+    "google-api-python-client>=2.100.0",
+    "google-auth-oauthlib>=1.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[project.scripts]
+gws-marketing-server = "gws_marketing.server:main"
+gws-marketing-login = "gws_marketing.auth:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,138 @@
+"""OAuth credential storage and flows for gws-marketing.
+
+Tokens live in the user config directory with restrictive permissions and are
+never stored inside the repository. Multiple Google accounts are supported via
+named profiles: ``tokens.json`` (default) plus ``tokens.<profile>.json``.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import stat
+from typing import Any
+
+from .gsc import SCOPES, client_secret_path, config_dir
+
+TOKENS_FILE = "tokens.json"
+_PROFILE_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
+
+
+def _validate_profile(profile: str) -> str:
+    """Reject profile names that could escape the config directory."""
+    if not _PROFILE_RE.match(profile):
+        raise ValueError(
+            "Profile/account names may only contain letters, numbers, '_' and '-'."
+        )
+    return profile
+
+
+def tokens_path(profile: str = "default") -> Any:
+    if profile == "default":
+        return config_dir() / TOKENS_FILE
+    return config_dir() / f"tokens.{_validate_profile(profile)}.json"
+
+
+def list_profiles() -> list[dict[str, Any]]:
+    """Summarize every stored token profile found in the config directory."""
+    base = config_dir()
+    profiles: list[dict[str, Any]] = []
+    if not base.exists():
+        return profiles
+    for path in sorted(base.glob("tokens*.json")):
+        if path.name == TOKENS_FILE:
+            name = "default"
+        elif path.name.startswith("tokens.") and path.name.endswith(".json"):
+            name = path.name[len("tokens.") : -len(".json")]
+        else:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            profiles.append({"account": name, "error": "unreadable token file"})
+            continue
+        profiles.append(
+            {
+                "account": name,
+                "scopes": sorted(data.get("scopes", [])),
+                "has_refresh_token": bool(data.get("refresh_token")),
+            }
+        )
+    return profiles
+
+
+def _write_private_json(path: Any, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(payload, indent=2)
+    path.write_text(raw, encoding="utf-8")
+    try:
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 600
+    except OSError:
+        pass  # Windows may not support POSIX modes fully; best effort.
+
+
+def login(profile: str = "default") -> str:
+    """Run the installed-app OAuth flow and persist refreshable tokens."""
+    secret = client_secret_path()
+    if secret is None or not secret.exists():
+        return (
+            "No OAuth client secret found. Set GWS_CLIENT_SECRET_FILE to the "
+            "downloaded desktop client_secret.json from your GCP project, "
+            "then retry."
+        )
+
+    # Imported lazily so tooling/tests never require these libs.
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    flow = InstalledAppFlow.from_client_secrets_file(str(secret), SCOPES)
+    credentials = flow.run_local_server(port=0)
+
+    _write_private_json(
+        tokens_path(profile),
+        {
+            "token": credentials.token,
+            "refresh_token": credentials.refresh_token,
+            "token_uri": credentials.token_uri,
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+            "scopes": list(credentials.scopes or []),
+        },
+    )
+    return f"Saved tokens for account '{profile}' to {tokens_path(profile)}"
+
+
+def load_credentials(profile: str = "default") -> Any:
+    """Load stored credentials, refreshing when expired. None if absent."""
+    path = tokens_path(profile)
+    if not path.exists():
+        return None
+
+    from google.oauth2.credentials import Credentials
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    credentials = Credentials.from_authorized_user_info(data, SCOPES)
+    if credentials.expired and credentials.refresh_token:
+        from google.auth.transport.requests import Request
+
+        credentials.refresh(Request())
+        _write_private_json(path, json.loads(credentials.to_json()))
+    return credentials
+
+
+def logout(profile: str = "default") -> str:
+    """Delete a stored token profile. Returns a human-readable result."""
+    path = tokens_path(profile)
+    if not path.exists():
+        return f"No stored tokens for account '{profile}'."
+    path.unlink()
+    return f"Removed stored tokens for account '{profile}'."
+
+
+def main() -> None:
+    print(login())
+
+
+if __name__ == "__main__":
+    main()
