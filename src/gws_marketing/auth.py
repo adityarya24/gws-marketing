@@ -12,7 +12,14 @@ import re
 import stat
 from typing import Any
 
-from .gsc import SCOPES, client_secret_path, config_dir
+from .gsc import (
+    DEFAULT_SCOPE_GROUPS,
+    RESTRICTED_GROUPS,
+    client_secret_path,
+    config_dir,
+    groups_for_scopes,
+    resolve_scopes,
+)
 
 TOKENS_FILE = "tokens.json"
 _PROFILE_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
@@ -71,8 +78,41 @@ def _write_private_json(path: Any, payload: dict[str, Any]) -> None:
         pass  # Windows may not support POSIX modes fully; best effort.
 
 
-def login(profile: str = "default") -> str:
-    """Run the installed-app OAuth flow and persist refreshable tokens."""
+def granted_scopes(profile: str = "default") -> list[str]:
+    """Scopes stored for a profile, or [] when it has never logged in."""
+    path = tokens_path(profile)
+    if not path.exists():
+        return []
+    try:
+        return list(json.loads(path.read_text(encoding="utf-8")).get("scopes", []))
+    except (OSError, ValueError):
+        return []
+
+
+def granted_groups(profile: str = "default") -> list[str]:
+    """Scope groups this profile has actually consented to."""
+    return groups_for_scopes(granted_scopes(profile))
+
+
+def default_groups() -> list[str]:
+    """Groups to request when the caller names none.
+
+    ``GWS_SCOPES`` lets an operator widen or narrow this without editing code,
+    e.g. ``GWS_SCOPES=search,analytics,gmail``.
+    """
+    raw = os.environ.get("GWS_SCOPES", "").strip()
+    if not raw:
+        return list(DEFAULT_SCOPE_GROUPS)
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+def login(profile: str = "default", groups: list[str] | None = None) -> str:
+    """Run the installed-app OAuth flow and persist refreshable tokens.
+
+    Only the requested groups are asked for. The default is the marketing core
+    (search + analytics); Gmail, Calendar and Drive are opt-in, so nobody hands
+    over their whole mailbox to read Search Console numbers.
+    """
     secret = client_secret_path()
     if secret is None or not secret.exists():
         return (
@@ -86,7 +126,10 @@ def login(profile: str = "default") -> str:
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
 
-    flow = InstalledAppFlow.from_client_secrets_file(str(secret), SCOPES)
+    requested = groups or default_groups()
+    scopes = resolve_scopes(requested)
+
+    flow = InstalledAppFlow.from_client_secrets_file(str(secret), scopes)
     credentials = flow.run_local_server(port=0)
 
     _write_private_json(
@@ -100,7 +143,17 @@ def login(profile: str = "default") -> str:
             "scopes": list(credentials.scopes or []),
         },
     )
-    return f"Saved tokens for account '{profile}' to {tokens_path(profile)}"
+    restricted = sorted(set(requested) & RESTRICTED_GROUPS)
+    note = ""
+    if restricted:
+        note = (
+            f" Granted restricted scope group(s): {', '.join(restricted)} —"
+            " these give broad access, so revoke with auth_logout when done."
+        )
+    return (
+        f"Saved tokens for account '{profile}' to {tokens_path(profile)}."
+        f" Scope groups: {', '.join(requested)}.{note}"
+    )
 
 
 def load_credentials(profile: str = "default") -> Any:
@@ -112,7 +165,7 @@ def load_credentials(profile: str = "default") -> Any:
     from google.oauth2.credentials import Credentials
 
     data = json.loads(path.read_text(encoding="utf-8"))
-    credentials = Credentials.from_authorized_user_info(data, SCOPES)
+    credentials = Credentials.from_authorized_user_info(data, data.get("scopes"))
     if credentials.expired and credentials.refresh_token:
         from google.auth.transport.requests import Request
 
