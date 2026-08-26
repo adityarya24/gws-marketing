@@ -1,23 +1,27 @@
 # gws-marketing
 
-Agent-facing MCP server for Google marketing data over stdio MCP, so local
-agents (OpenCode/Claude/Codex/Cursor) can query Search Console, GA4, Gmail,
-Calendar and Drive without leaving chat.
+**v0.2.1** — Agent-facing MCP server for Google marketing data over stdio MCP,
+so local agents (OpenCode/Claude/Codex/Cursor) can query Search Console, GA4,
+Gmail, Calendar and Drive without leaving chat.
 
 Everything is read-only **except** `gmail_create_draft`, which writes a draft.
 Sending mail is deliberately not implemented — every outbound message stays
 human-reviewed.
 
-Pattern mirror of `astro-skill`: low-level `mcp` stdio server, explicit JSON
-schemas, tool registry as single source of truth, mocked tests.
+Low-level `mcp` stdio server with explicit JSON schemas, a tool registry as the
+single source of truth, and mocked tests (43 passing).
 
-## Status
+## What's shipped
 
-- Phase 0 survey + plan: done (see `PLAN.md`)
-- Phase 1 scaffold: GSC read-only tools implemented with mock-based tests
-- Since then: GA4, Gmail (read + draft), Calendar and Drive tools added
-- Live OAuth smoke: **verified** against a real Search Console property
-  (site listing + search analytics + URL inspection), 2026-08-23.
+- **15 MCP tools** across GSC, GA4, Gmail, Calendar, Drive, and built-in auth
+- **Scoped OAuth** — default consent is `search + analytics` only; Gmail and
+  Drive are opt-in restricted scopes
+- **Multi-account** token profiles via optional `account` parameter
+- **Structured MCP errors** — validation and runtime failures return JSON the
+  agent can act on
+- Live-smoked against real Google accounts (GSC, GA4, Workspace reads)
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Tools
 
@@ -131,6 +135,9 @@ scope groups you need (default is `search` + `analytics`).
 
 ## Roadmap
 
-See `PLAN.md`. Shipped so far: GSC reads, GA4 reports, built-in auth tools,
-and Workspace reads/drafts (Gmail search + draft-only, Calendar, Drive).
-Later: Business Profile reads and write operations behind confirmation gates.
+| Next | Blocked on |
+|---|---|
+| Composite workflows (SEO digest → draft email, inbox triage) | — |
+| Approval-gated writes (Gmail send, Calendar events, Drive mutations) | product design |
+| Business Profile reads | Google API access approval |
+| Google Ads tools | Ads developer token (Basic Access) |

@@ -1,9 +1,9 @@
 """gws-marketing stdio MCP server.
 
 Binds the registry in :mod:`gws_marketing.tools` to a low-level Model Context
-Protocol stdio server, mirroring the astro-skill convention: the registry
-stays the single source of truth and schemas are declared explicitly for a
-predictable wire contract with any MCP client.
+Protocol stdio server. The registry stays the single source of truth and
+schemas are declared explicitly for a predictable wire contract with any MCP
+client.
 """
 from __future__ import annotations
 
