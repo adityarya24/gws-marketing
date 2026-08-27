@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
 from .ga4 import MAX_DIMENSIONS as GA4_MAX_DIMENSIONS
@@ -18,6 +19,7 @@ from .gsc import MAX_ROW_LIMIT
 
 VALID_DIMENSIONS = {"date", "query", "page", "device", "country"}
 
+_GSC_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _GA4_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _GA4_RELATIVE_RE = re.compile(r"^\d+daysAgo$")
 _GA4_IDENT_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
@@ -35,9 +37,27 @@ def handle_list_sites(client: Any, **_kwargs: Any) -> dict[str, Any]:
 
 
 def _validate_dates(start_date: str, end_date: str) -> None:
+    """Reject anything Search Console will only reject later, with a worse error.
+
+    The shape check alone let '2026-13-45' through to the API, so the caller
+    got an opaque 400 instead of being told what was wrong. GA4 already
+    validates properly; this brings GSC in line.
+    """
     for value in (start_date, end_date):
-        if not isinstance(value, str) or len(value) != 10 or value[4] != "-" or value[7] != "-":
-            raise ValueError("Dates must be YYYY-MM-DD strings.")
+        # fromisoformat alone is too permissive on 3.11+ (it accepts
+        # '20260826' and week dates), so the shape is checked first.
+        if not isinstance(value, str) or not _GSC_DATE_RE.match(value):
+            raise ValueError(f"'{value}' must be a YYYY-MM-DD string.")
+        try:
+            date.fromisoformat(value)
+        except ValueError:
+            raise ValueError(
+                f"'{value}' is not a real calendar date."
+            ) from None
+    if start_date > end_date:
+        raise ValueError(
+            f"start_date '{start_date}' is after end_date '{end_date}'."
+        )
 
 
 def handle_search_analytics(client: Any, **kwargs: Any) -> dict[str, Any]:

@@ -69,11 +69,27 @@ def list_profiles() -> list[dict[str, Any]]:
 
 
 def _write_private_json(path: Any, payload: dict[str, Any]) -> None:
+    """Write JSON that only the owner can read, with no readable window.
+
+    Writing first and chmod-ing afterwards leaves the refresh token on disk
+    at the process umask (commonly 0644) until the chmod lands. Creating the
+    file with 0600 up front closes that window; the chmod still runs so an
+    existing wider-permission file gets tightened too.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     raw = json.dumps(payload, indent=2)
-    path.write_text(raw, encoding="utf-8")
+    mode = stat.S_IRUSR | stat.S_IWUSR  # 600
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(path, flags, mode)
     try:
-        path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 600
+        handle = os.fdopen(fd, "w", encoding="utf-8")
+    except BaseException:
+        os.close(fd)  # fdopen did not take ownership, so close it here.
+        raise
+    with handle:
+        handle.write(raw)
+    try:
+        path.chmod(mode)
     except OSError:
         pass  # Windows may not support POSIX modes fully; best effort.
 
