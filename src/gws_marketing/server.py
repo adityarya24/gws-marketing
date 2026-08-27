@@ -54,7 +54,15 @@ def get_client(tool_name: str, account: str = "default") -> Any:
         return GcalRestClient.from_credentials(credentials)
     if tool_name.startswith("drive_"):
         return DriveRestClient.from_credentials(credentials)
-    return Ga4RestClient.from_credentials(credentials)
+    if tool_name.startswith("ga4_"):
+        return Ga4RestClient.from_credentials(credentials)
+    # Falling through used to hand back a GA4 client, so a new tool family
+    # added without a prefix here would silently talk to the wrong API with
+    # no scope check at all.
+    raise RuntimeError(
+        f"No client is registered for tool '{tool_name}'. Add its prefix to "
+        "get_client and to TOOL_GROUPS in gsc.py."
+    )
 
 
 def build_tool_definitions() -> list[types.Tool]:
@@ -83,11 +91,30 @@ async def handle_call(name: str, arguments: dict[str, Any]) -> list[types.TextCo
         # Run handlers in a worker thread: auth_login may block for minutes while
         # the user consents in the browser, and the loop must stay responsive.
         result = await asyncio.to_thread(handler, client, **(arguments or {}))
+    except KeyError as exc:
+        # A required argument the schema should have enforced but a client
+        # omitted anyway: report it like any other validation failure instead
+        # of letting it escape this handler.
+        payload = {
+            "error": f"Missing required argument: {exc}",
+            "type": "validation_error",
+            "tool": name,
+        }
+        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
     except ValueError as exc:
         payload = {"error": str(exc), "type": "validation_error", "tool": name}
         return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
     except RuntimeError as exc:
         payload = {"error": str(exc), "type": "runtime_error", "tool": name}
+        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
+    except Exception as exc:  # noqa: BLE001 - a tool error must never kill the server
+        # Network failures, JSON decode errors and anything else a Google
+        # client can raise reach the caller as a normal tool error.
+        payload = {
+            "error": f"{type(exc).__name__}: {exc}",
+            "type": "unexpected_error",
+            "tool": name,
+        }
         return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
 
     return [types.TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
