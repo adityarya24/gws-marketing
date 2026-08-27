@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 
 import pytest
-import mcp.types as types
 
 import gws_marketing.server as srv
 
@@ -91,20 +90,16 @@ def test_get_client_refuses_a_tool_whose_group_was_not_granted(monkeypatch):
     Without this gate the call reaches Google and comes back as an opaque 403,
     which tells the user nothing about what to do next.
     """
-    import gws_marketing.auth as auth
-
-    monkeypatch.setattr(auth, "load_credentials", lambda account="default": object())
-    monkeypatch.setattr(auth, "granted_groups", lambda account="default": ["search"])
+    monkeypatch.setattr(srv, "load_credentials", lambda account="default": object())
+    monkeypatch.setattr(srv, "granted_groups", lambda account="default": ["search"])
 
     with pytest.raises(RuntimeError, match="has not granted the 'gmail' scope group"):
         srv.get_client("gmail_search_messages")
 
 
 def test_get_client_allows_a_tool_whose_group_was_granted(monkeypatch):
-    import gws_marketing.auth as auth
-
-    monkeypatch.setattr(auth, "load_credentials", lambda account="default": object())
-    monkeypatch.setattr(auth, "granted_groups", lambda account="default": ["search"])
+    monkeypatch.setattr(srv, "load_credentials", lambda account="default": object())
+    monkeypatch.setattr(srv, "granted_groups", lambda account="default": ["search"])
     monkeypatch.setattr(
         srv, "build_client", lambda credentials: "gsc-client"
     )

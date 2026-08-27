@@ -220,7 +220,7 @@ def test_ga4_run_report_requires_metric_and_bounds_row_limit():
 
 
 def test_auth_status_lists_profiles(monkeypatch):
-    import gws_marketing.auth as auth
+    from gws_marketing import auth
 
     monkeypatch.setattr(
         auth, "list_profiles",
@@ -232,7 +232,7 @@ def test_auth_status_lists_profiles(monkeypatch):
 
 
 def test_auth_login_passes_profile(monkeypatch):
-    import gws_marketing.auth as auth
+    from gws_marketing import auth
 
     seen = {}
 
@@ -254,7 +254,7 @@ def test_auth_login_defaults_exclude_restricted_scopes(monkeypatch):
     This is the whole point of grouping scopes: someone reading Search Console
     numbers should never be asked to hand over their mailbox.
     """
-    import gws_marketing.auth as auth
+    from gws_marketing import auth
 
     seen = {}
 
@@ -272,7 +272,7 @@ def test_auth_login_defaults_exclude_restricted_scopes(monkeypatch):
 
 
 def test_auth_login_forwards_requested_groups(monkeypatch):
-    import gws_marketing.auth as auth
+    from gws_marketing import auth
 
     seen = {}
 
@@ -287,7 +287,7 @@ def test_auth_login_forwards_requested_groups(monkeypatch):
 
 
 def test_auth_login_rejects_non_list_scopes(monkeypatch):
-    import gws_marketing.auth as auth
+    from gws_marketing import auth
 
     monkeypatch.setattr(
         auth,
@@ -303,7 +303,7 @@ def test_auth_login_rejects_non_list_scopes(monkeypatch):
 
 
 def test_auth_login_reports_error_when_client_secret_missing(monkeypatch):
-    import gws_marketing.auth as auth
+    from gws_marketing import auth
 
     monkeypatch.setattr(
         auth,
@@ -319,7 +319,7 @@ def test_auth_login_reports_error_when_client_secret_missing(monkeypatch):
 
 
 def test_auth_logout_passes_profile(monkeypatch):
-    import gws_marketing.auth as auth
+    from gws_marketing import auth
 
     monkeypatch.setattr(auth, "logout", lambda profile: f"removed {profile}")
     out = handle_auth_logout(None, account="stale")
@@ -410,7 +410,11 @@ def test_drive_escape_query_literals():
 
 
 def test_resolve_scopes_defaults_and_rejects_unknown():
-    from gws_marketing.gsc import DEFAULT_SCOPE_GROUPS, RESTRICTED_GROUPS, resolve_scopes
+    from gws_marketing.gsc import (
+        DEFAULT_SCOPE_GROUPS,
+        RESTRICTED_GROUPS,
+        resolve_scopes,
+    )
 
     default = resolve_scopes()
     assert default == [

@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import mcp.types as types
+from mcp import types
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
@@ -69,7 +69,7 @@ async def handle_call(name: str, arguments: dict[str, Any]) -> list[types.TextCo
 
     try:
         handler = TOOLS[name]
-    except KeyError as exc:
+    except KeyError:
         payload = {"error": f"Unknown gws-marketing tool: {name}", "type": "unknown_tool"}
         return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
 

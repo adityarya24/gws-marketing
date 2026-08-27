@@ -24,7 +24,7 @@ class Ga4RestClient:
         self._session = session
 
     @classmethod
-    def from_credentials(cls, credentials: Any) -> "Ga4RestClient":
+    def from_credentials(cls, credentials: Any) -> Ga4RestClient:
         from google.auth.transport.requests import AuthorizedSession
 
         return cls(AuthorizedSession(credentials))
