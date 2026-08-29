@@ -105,3 +105,43 @@ def test_get_client_allows_a_tool_whose_group_was_granted(monkeypatch):
     )
 
     assert srv.get_client("gsc_list_sites") == "gsc-client"
+
+
+def test_missing_required_argument_returns_a_validation_error(monkeypatch):
+    """A missing required arg must not escape handle_call.
+
+    Every other failure mode already comes back as a JSON tool error; a
+    KeyError from ``kwargs["site_url"]`` used to propagate instead.
+    """
+    monkeypatch.setattr(srv, "get_client", lambda name, account="default": object())
+
+    result = asyncio_run(srv.handle_call("gsc_list_sitemaps", {}))
+    payload = json.loads(result[0].text)
+
+    assert payload["type"] == "validation_error"
+    assert "site_url" in payload["error"]
+
+
+def test_unexpected_exceptions_come_back_as_tool_errors(monkeypatch):
+    """A client blowing up (network, JSON, anything) is still a tool error."""
+
+    def explode(*_args, **_kwargs):
+        raise ConnectionError("connection reset by peer")
+
+    monkeypatch.setattr(srv, "get_client", lambda name, account="default": object())
+    monkeypatch.setitem(srv.TOOLS, "gsc_list_sites", explode)
+
+    result = asyncio_run(srv.handle_call("gsc_list_sites", {}))
+    payload = json.loads(result[0].text)
+
+    assert payload["type"] == "unexpected_error"
+    assert "ConnectionError" in payload["error"]
+
+
+def test_get_client_refuses_a_tool_family_it_has_no_client_for(monkeypatch):
+    """An unregistered prefix must raise, not quietly return the GA4 client."""
+    monkeypatch.setattr(srv, "load_credentials", lambda account="default": object())
+    monkeypatch.setattr(srv, "granted_groups", lambda account="default": ["search"])
+
+    with pytest.raises(RuntimeError, match="No client is registered"):
+        srv.get_client("sheets_read_range")
