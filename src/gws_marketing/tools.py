@@ -8,7 +8,8 @@ server resolves the right real client lazily from the tool-name prefix.
 from __future__ import annotations
 
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from .ga4 import MAX_DIMENSIONS as GA4_MAX_DIMENSIONS
 from .ga4 import MAX_METRICS as GA4_MAX_METRICS

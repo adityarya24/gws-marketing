@@ -18,7 +18,7 @@ class DriveRestClient:
         self._session = session
 
     @classmethod
-    def from_credentials(cls, credentials: Any) -> "DriveRestClient":
+    def from_credentials(cls, credentials: Any) -> DriveRestClient:
         from google.auth.transport.requests import AuthorizedSession
 
         return cls(AuthorizedSession(credentials))

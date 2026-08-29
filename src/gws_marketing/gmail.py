@@ -21,7 +21,7 @@ class GmailRestClient:
         self._session = session
 
     @classmethod
-    def from_credentials(cls, credentials: Any) -> "GmailRestClient":
+    def from_credentials(cls, credentials: Any) -> GmailRestClient:
         from google.auth.transport.requests import AuthorizedSession
 
         return cls(AuthorizedSession(credentials))

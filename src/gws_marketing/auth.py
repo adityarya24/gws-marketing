@@ -128,8 +128,6 @@ def login(profile: str = "default", groups: list[str] | None = None) -> dict[str
         }
 
     # Imported lazily so tooling/tests never require these libs.
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
 
     requested = groups or default_groups()
