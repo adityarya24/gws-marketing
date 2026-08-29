@@ -1,6 +1,8 @@
 """Registry behaviour tests with fake clients — no network, no Google libs."""
 from __future__ import annotations
 
+import stat
+
 import pytest
 
 from gws_marketing.tools import (
@@ -454,3 +456,61 @@ def test_group_for_tool_maps_every_tool_family():
     assert group_for_tool("gcal_list_events") == "calendar"
     assert group_for_tool("drive_search_files") == "drive"
     assert group_for_tool("auth_status") is None
+
+
+def test_search_analytics_rejects_an_impossible_date():
+    """'2026-13-45' has the right shape but is not a real date."""
+    with pytest.raises(ValueError, match="not a real calendar date"):
+        handle_search_analytics(
+            FakeGscClient(),
+            site_url="https://example.com/",
+            start_date="2026-13-45",
+            end_date="2026-08-26",
+        )
+
+
+def test_search_analytics_rejects_a_non_iso_shape():
+    with pytest.raises(ValueError, match="YYYY-MM-DD"):
+        handle_search_analytics(
+            FakeGscClient(),
+            site_url="https://example.com/",
+            start_date="20260826",
+            end_date="2026-08-26",
+        )
+
+
+def test_search_analytics_rejects_a_reversed_range():
+    with pytest.raises(ValueError, match="is after end_date"):
+        handle_search_analytics(
+            FakeGscClient(),
+            site_url="https://example.com/",
+            start_date="2026-08-26",
+            end_date="2026-08-01",
+        )
+
+
+def test_tokens_are_created_at_0600_not_chmodded_afterwards(tmp_path, monkeypatch):
+    """The token file must be born 0600, with no readable window.
+
+    Asserting the final mode is not enough: writing at umask and chmod-ing
+    afterwards also ends at 0600. This checks the mode handed to os.open,
+    which is what actually closes the window.
+    """
+    import os as real_os
+
+    from gws_marketing import auth
+
+    seen: dict[str, int] = {}
+    original_open = real_os.open
+
+    def recording_open(path, flags, mode=0o777):
+        seen["mode"] = mode
+        return original_open(path, flags, mode)
+
+    monkeypatch.setattr(auth.os, "open", recording_open)
+
+    target = tmp_path / "tokens.json"
+    auth._write_private_json(target, {"refresh_token": "secret"})
+
+    assert seen["mode"] == 0o600
+    assert stat.S_IMODE(target.stat().st_mode) == 0o600
