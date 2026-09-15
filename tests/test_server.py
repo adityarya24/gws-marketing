@@ -4,8 +4,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -268,7 +268,7 @@ def test_stdio_wire_preserves_mcp_error_flag_without_oauth(tmp_path):
             process.terminate()
             try:
                 await asyncio.wait_for(process.wait(), timeout=5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 process.kill()
                 await process.wait()
 
