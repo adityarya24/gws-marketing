@@ -169,6 +169,18 @@ def handle_ga4_run_report(client: Any, **kwargs: Any) -> dict[str, Any]:
     if offset < 0:
         raise ValueError("offset must be >= 0.")
 
+    hostname = kwargs.get("hostname")
+    report_options: dict[str, Any] = {}
+    if hostname is not None:
+        if not isinstance(hostname, str) or not re.fullmatch(
+            r"(?=.{1,253}\Z)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+            r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*",
+            hostname,
+        ):
+            raise ValueError("hostname must be a bare hostname, without scheme, port or path.")
+        hostname = hostname.lower()
+        report_options["hostname"] = hostname
+
     result = client.run_report(
         property_id=property_id,
         start_date=start_date,
@@ -177,6 +189,7 @@ def handle_ga4_run_report(client: Any, **kwargs: Any) -> dict[str, Any]:
         metrics=metrics,
         row_limit=row_limit,
         offset=offset,
+        **report_options,
     )
     return {
         "property_id": property_id,
@@ -186,6 +199,7 @@ def handle_ga4_run_report(client: Any, **kwargs: Any) -> dict[str, Any]:
         "metrics": metrics,
         "row_count": result.get("row_count", 0),
         "rows": result.get("rows", []),
+        **report_options,
     }
 
 
@@ -388,6 +402,10 @@ SCHEMAS: dict[str, dict[str, Any]] = {
     "ga4_run_report": {
         "type": "object",
         "properties": {
+            "hostname": {
+                "type": "string",
+                "description": "Optional exact hostname filter (case-insensitive), e.g. example.com. No scheme, port or path. Omit for all hosts.",
+            },
             "property_id": {
                 "type": "string",
                 "description": "Numeric GA4 property ID as listed by ga4_list_properties.",

@@ -32,7 +32,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 | `gsc_list_sitemaps` | `search` | List submitted sitemaps for a property |
 | `gsc_inspect_url` | `search` | URL inspection (indexing status) |
 | `ga4_list_properties` | `analytics` | List GA4 properties |
-| `ga4_run_report` | `analytics` | Run a GA4 report by metrics/dimensions |
+| `ga4_run_report` | `analytics` | Run a GA4 report by metrics/dimensions, optionally filtered to an exact hostname |
 | `gmail_search_messages` | `gmail` | Search the mailbox |
 | `gmail_get_message` | `gmail` | Fetch one message |
 | `gmail_create_draft` | `gmail` | **Writes** a draft (never sends) |
