@@ -8,6 +8,7 @@ client.
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 from mcp import types
@@ -72,14 +73,32 @@ def build_tool_definitions() -> list[types.Tool]:
     ]
 
 
-async def handle_call(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
-    import json
+def _json_result(payload: Any, *, is_error: bool) -> types.CallToolResult:
+    """Keep JSON content and the MCP error flag together at the dispatch edge."""
+    return types.CallToolResult(
+        content=[
+            types.TextContent(
+                type="text", text=json.dumps(payload, indent=2, default=str)
+            )
+        ],
+        isError=is_error,
+    )
+
+
+async def handle_call(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+    """Dispatch a tool and return a complete MCP call result.
+
+    Error payloads remain JSON so existing callers can inspect their type and
+    message, while ``isError`` tells MCP clients that the call failed. The
+    flag is set explicitly on each failure path; it is never inferred from a
+    successful tool's data (which may legitimately contain an ``error`` key).
+    """
 
     try:
         handler = TOOLS[name]
     except KeyError:
         payload = {"error": f"Unknown gws-marketing tool: {name}", "type": "unknown_tool"}
-        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
+        return _json_result(payload, is_error=True)
 
     try:
         # Auth handlers manage local token storage and need no API client.
@@ -100,13 +119,13 @@ async def handle_call(name: str, arguments: dict[str, Any]) -> list[types.TextCo
             "type": "validation_error",
             "tool": name,
         }
-        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
+        return _json_result(payload, is_error=True)
     except ValueError as exc:
         payload = {"error": str(exc), "type": "validation_error", "tool": name}
-        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
+        return _json_result(payload, is_error=True)
     except RuntimeError as exc:
         payload = {"error": str(exc), "type": "runtime_error", "tool": name}
-        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
+        return _json_result(payload, is_error=True)
     except Exception as exc:  # noqa: BLE001 - a tool error must never kill the server
         # Network failures, JSON decode errors and anything else a Google
         # client can raise reach the caller as a normal tool error.
@@ -115,9 +134,18 @@ async def handle_call(name: str, arguments: dict[str, Any]) -> list[types.TextCo
             "type": "unexpected_error",
             "tool": name,
         }
-        return [types.TextContent(type="text", text=json.dumps(payload, indent=2))]
+        return _json_result(payload, is_error=True)
 
-    return [types.TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
+    # ``auth_login`` deliberately returns status=error for a missing client
+    # secret so its structured message reaches the caller. That known outcome
+    # is an MCP failure, unlike an arbitrary business payload containing an
+    # ``error`` field.
+    auth_failed = (
+        name == "auth_login"
+        and isinstance(result, dict)
+        and result.get("status") == "error"
+    )
+    return _json_result(result, is_error=auth_failed)
 
 
 def create_server() -> Server:
@@ -128,7 +156,7 @@ def create_server() -> Server:
         return build_tool_definitions()
 
     @server.call_tool()
-    async def _call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
+    async def _call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         return await handle_call(name, arguments)
 
     return server
