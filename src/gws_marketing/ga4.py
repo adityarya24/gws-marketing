@@ -62,6 +62,7 @@ class Ga4RestClient:
         metrics: list[str] | None = None,
         row_limit: int = 100,
         offset: int = 0,
+        hostname: str | None = None,
     ) -> dict[str, Any]:
         """Run one report against ``properties/{property_id}`` and flatten rows."""
         body: dict[str, Any] = {
@@ -73,6 +74,17 @@ class Ga4RestClient:
             body["dimensions"] = [{"name": name} for name in dimensions]
         if metrics:
             body["metrics"] = [{"name": name} for name in metrics]
+        if hostname is not None:
+            body["dimensionFilter"] = {
+                "filter": {
+                    "fieldName": "hostName",
+                    "stringFilter": {
+                        "matchType": "EXACT",
+                        "value": hostname,
+                        "caseSensitive": False,
+                    },
+                }
+            }
 
         response = self._session.post(
             f"{DATA_BASE}/properties/{property_id}:runReport", json=body
