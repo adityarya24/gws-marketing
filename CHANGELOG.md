@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Fixed
+- MCP tool failures now set the protocol-level `isError` flag while keeping
+  their structured JSON payloads; successful business data is not inferred as
+  an error from an `error` field.
+
 ## [0.2.1] - 2026-08-26
 
 ### Fixed
