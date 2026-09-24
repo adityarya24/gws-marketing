@@ -16,6 +16,7 @@ from .ga4 import MAX_DIMENSIONS as GA4_MAX_DIMENSIONS
 from .ga4 import MAX_METRICS as GA4_MAX_METRICS
 from .ga4 import MAX_ROW_LIMIT as GA4_MAX_ROW_LIMIT
 from .gsc import MAX_ROW_LIMIT
+from .jev import MAX_PAGES, classify_queries, load_api_key
 
 VALID_DIMENSIONS = {"date", "query", "page", "device", "country"}
 
@@ -108,6 +109,71 @@ def handle_inspect_url(client: Any, **kwargs: Any) -> dict[str, Any]:
     verdict = result.get("indexStatusResult", {}).get("verdict")
     return {"inspection_result": result, "verdict": verdict}
 
+
+
+MAX_CLASSIFY_QUERIES = 100
+
+
+def handle_classify_queries(client: Any, **kwargs: Any) -> dict[str, Any]:
+    """Pull the top queries for a range and label each one's search intent.
+
+    The labels come from TypeSafe Jev (see ``jev.py``); the clicks,
+    impressions and position stay Search Console's own numbers.
+    """
+    site_url = kwargs["site_url"]
+    start_date = kwargs["start_date"]
+    end_date = kwargs["end_date"]
+    _validate_dates(start_date, end_date)
+
+    row_limit = int(kwargs.get("row_limit", 50))
+    if not 1 <= row_limit <= MAX_CLASSIFY_QUERIES:
+        raise ValueError(f"row_limit must be between 1 and {MAX_CLASSIFY_QUERIES}.")
+    brand_terms = [str(term) for term in kwargs.get("brand_terms") or []]
+    pages = kwargs.get("pages") or []
+    for page in pages:
+        if not isinstance(page, dict) or not isinstance(page.get("url"), str):
+            # ValueError, not TypeError: the server reports it as a validation_error.
+            raise ValueError("Each page must be an object with a 'url' string.")  # noqa: TRY004
+    # Fail on a missing key before spending a Search Console call.
+    api_key = load_api_key()
+
+    rows = client.search_analytics(
+        site_url=site_url,
+        start_date=start_date,
+        end_date=end_date,
+        dimensions=["query"],
+        query=None,
+        row_limit=row_limit,
+        start_row=0,
+    )
+    queries = [row["keys"][0] for row in rows]
+    labels = classify_queries(
+        queries, site=site_url, brand_terms=brand_terms, pages=pages, api_key=api_key
+    )
+
+    classified = []
+    summary: dict[str, dict[str, int]] = {}
+    for row, label in zip(rows, labels):
+        entry = {
+            **label,
+            "clicks": row.get("clicks", 0),
+            "impressions": row.get("impressions", 0),
+            "position": round(float(row.get("position", 0)), 1),
+        }
+        classified.append(entry)
+        bucket = summary.setdefault(label.get("intent") or "unclassified",
+                                    {"queries": 0, "clicks": 0, "impressions": 0})
+        bucket["queries"] += 1
+        bucket["clicks"] += entry["clicks"]
+        bucket["impressions"] += entry["impressions"]
+    return {
+        "site_url": site_url,
+        "start_date": start_date,
+        "end_date": end_date,
+        "summary": summary,
+        "queries": classified,
+        "count": len(classified),
+    }
 
 # --- GA4 handlers ---------------------------------------------------------------
 
@@ -376,6 +442,38 @@ SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["site_url", "start_date", "end_date"],
         "additionalProperties": False,
     },
+    "gsc_classify_queries": {
+        "type": "object",
+        "properties": {
+            **_SITE_URL_PROPERTY,
+            "start_date": {"type": "string", "description": "Range start, YYYY-MM-DD."},
+            "end_date": {"type": "string", "description": "Range end, YYYY-MM-DD."},
+            "row_limit": {
+                "type": "integer",
+                "description": f"Top queries to label, 1-{MAX_CLASSIFY_QUERIES}. Default 50.",
+            },
+            "brand_terms": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Names people use for the brand, so navigational queries read as 'brand'.",
+            },
+            "pages": {
+                "type": "array",
+                "maxItems": MAX_PAGES,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string"},
+                        "about": {"type": "string", "description": "One line on what the page offers."},
+                    },
+                    "required": ["url"],
+                },
+                "description": "Optional candidate pages; each query also gets the best-matching one.",
+            },
+        },
+        "required": ["site_url", "start_date", "end_date"],
+        "additionalProperties": False,
+    },
     "gsc_list_sitemaps": {
         "type": "object",
         "properties": {**_SITE_URL_PROPERTY},
@@ -539,6 +637,12 @@ SCHEMAS: dict[str, dict[str, Any]] = {
 }
 
 DESCRIPTIONS: dict[str, str] = {
+    "gsc_classify_queries": (
+        "Label the top Search Console queries by search intent (brand, question, "
+        "tool, purchase, other) with a confidence score, plus the best page for "
+        "each when candidate pages are given. Uses TypeSafe Jev; needs "
+        "TYPESAFE_API_KEY. Read-only on Google."
+    ),
     "gsc_list_sites": "List Search Console properties accessible to the authenticated user.",
     "gsc_search_analytics": (
         "Query GSC performance data: clicks, impressions, ctr, position grouped by "
@@ -591,6 +695,7 @@ TOOLS: dict[str, Callable[..., dict[str, Any]]] = {
     "gsc_search_analytics": handle_search_analytics,
     "gsc_list_sitemaps": handle_list_sitemaps,
     "gsc_inspect_url": handle_inspect_url,
+    "gsc_classify_queries": handle_classify_queries,
     "ga4_list_properties": handle_ga4_list_properties,
     "ga4_run_report": handle_ga4_run_report,
     "auth_status": handle_auth_status,

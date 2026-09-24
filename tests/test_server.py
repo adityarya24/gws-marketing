@@ -25,6 +25,7 @@ def test_build_tool_definitions_matches_registry():
     by_name = {t.name: t for t in tools}
     assert set(by_name) == {
         "gsc_list_sites", "gsc_search_analytics", "gsc_list_sitemaps", "gsc_inspect_url",
+        "gsc_classify_queries",
         "ga4_list_properties", "ga4_run_report",
         "auth_status", "auth_login", "auth_logout",
         "gmail_search_messages", "gmail_get_message", "gmail_create_draft",

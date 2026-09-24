@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+- `gsc_classify_queries`: labels the top Search Console queries by search
+  intent (brand, question, tool, purchase, other) with a confidence score, and
+  optionally picks the best page for each from a candidate list. Labels come
+  from TypeSafe Jev; the key is read from `TYPESAFE_API_KEY` or `typesafe.key`
+  in the config directory. A failed query is reported on its own row instead
+  of failing the batch.
+
 ### Fixed
 - MCP tool failures now set the protocol-level `isError` flag while keeping
   their structured JSON payloads; successful business data is not inferred as

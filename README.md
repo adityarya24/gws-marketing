@@ -9,11 +9,11 @@ Sending mail is deliberately not implemented — every outbound message stays
 human-reviewed.
 
 Low-level `mcp` stdio server with explicit JSON schemas, a tool registry as the
-single source of truth, and mocked tests (43 passing).
+single source of truth, and mocked tests (82 passing).
 
 ## What's shipped
 
-- **15 MCP tools** across GSC, GA4, Gmail, Calendar, Drive, and built-in auth
+- **16 MCP tools** across GSC, GA4, Gmail, Calendar, Drive, and built-in auth
 - **Scoped OAuth** — default consent is `search + analytics` only; Gmail and
   Drive are opt-in restricted scopes
 - **Multi-account** token profiles via optional `account` parameter
@@ -31,6 +31,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 | `gsc_search_analytics` | `search` | Click/impression/CTR/position rows by dimensions |
 | `gsc_list_sitemaps` | `search` | List submitted sitemaps for a property |
 | `gsc_inspect_url` | `search` | URL inspection (indexing status) |
+| `gsc_classify_queries` | `search` + TypeSafe key | Label top queries by search intent, with confidence and best page ([TypeSafe Jev](https://typesafe.ai)) |
 | `ga4_list_properties` | `analytics` | List GA4 properties |
 | `ga4_run_report` | `analytics` | Run a GA4 report by metrics/dimensions, optionally filtered to an exact hostname |
 | `gmail_search_messages` | `gmail` | Search the mailbox |
