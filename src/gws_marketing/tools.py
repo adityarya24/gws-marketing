@@ -101,6 +101,13 @@ def handle_list_sitemaps(client: Any, **kwargs: Any) -> dict[str, Any]:
     return {"site_url": site_url, "sitemaps": sitemaps, "count": len(sitemaps)}
 
 
+def handle_submit_sitemap(client: Any, **kwargs: Any) -> dict[str, Any]:
+    site_url = kwargs["site_url"]
+    sitemap_url = kwargs["sitemap_url"]
+    client.submit_sitemap(site_url=site_url, feedpath=sitemap_url)
+    return {"site_url": site_url, "sitemap_url": sitemap_url, "submitted": True}
+
+
 def handle_inspect_url(client: Any, **kwargs: Any) -> dict[str, Any]:
     result = client.inspect_url(
         site_url=kwargs["site_url"],
@@ -480,6 +487,18 @@ SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["site_url"],
         "additionalProperties": False,
     },
+    "gsc_submit_sitemap": {
+        "type": "object",
+        "properties": {
+            **_SITE_URL_PROPERTY,
+            "sitemap_url": {
+                "type": "string",
+                "description": "Full sitemap URL, e.g. https://example.com/sitemap.xml.",
+            },
+        },
+        "required": ["site_url", "sitemap_url"],
+        "additionalProperties": False,
+    },
     "gsc_inspect_url": {
         "type": "object",
         "properties": {
@@ -650,6 +669,10 @@ DESCRIPTIONS: dict[str, str] = {
     ),
     "gsc_list_sitemaps": "List sitemaps submitted for a Search Console property.",
     "gsc_inspect_url": "Inspect a URL's Google index status via URL Inspection API.",
+    "gsc_submit_sitemap": (
+        "Submit or resubmit a sitemap so Google re-reads it. Needs the opt-in "
+        "'search_write' scope group; this is the only Search Console write."
+    ),
     "ga4_list_properties": (
         "List GA4 accounts and properties visible to the authenticated user, "
         "with numeric property IDs for reporting."
@@ -695,6 +718,7 @@ TOOLS: dict[str, Callable[..., dict[str, Any]]] = {
     "gsc_search_analytics": handle_search_analytics,
     "gsc_list_sitemaps": handle_list_sitemaps,
     "gsc_inspect_url": handle_inspect_url,
+    "gsc_submit_sitemap": handle_submit_sitemap,
     "gsc_classify_queries": handle_classify_queries,
     "ga4_list_properties": handle_ga4_list_properties,
     "ga4_run_report": handle_ga4_run_report,

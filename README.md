@@ -31,6 +31,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 | `gsc_search_analytics` | `search` | Click/impression/CTR/position rows by dimensions |
 | `gsc_list_sitemaps` | `search` | List submitted sitemaps for a property |
 | `gsc_inspect_url` | `search` | URL inspection (indexing status) |
+| `gsc_submit_sitemap` | `search_write` (opt-in) | Submit or resubmit a sitemap (the only Search Console write) |
 | `gsc_classify_queries` | `search` + TypeSafe key | Label top queries by search intent, with confidence and best page ([TypeSafe Jev](https://typesafe.ai)) |
 | `ga4_list_properties` | `analytics` | List GA4 properties |
 | `ga4_run_report` | `analytics` | Run a GA4 report by metrics/dimensions, optionally filtered to an exact hostname |

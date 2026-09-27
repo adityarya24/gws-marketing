@@ -22,6 +22,9 @@ from typing import Any
 # management; SENDING is deliberately not implemented in any phase < 4).
 SCOPE_GROUPS: dict[str, list[str]] = {
     "search": ["https://www.googleapis.com/auth/webmasters.readonly"],
+    # Full Search Console access, opt-in only: submitting a sitemap is the one
+    # write we expose, and nothing in the default set should need it.
+    "search_write": ["https://www.googleapis.com/auth/webmasters"],
     "analytics": ["https://www.googleapis.com/auth/analytics.readonly"],
     "gmail": [
         "https://www.googleapis.com/auth/gmail.readonly",
@@ -39,7 +42,9 @@ DEFAULT_SCOPE_GROUPS: tuple[str, ...] = ("search", "analytics")
 RESTRICTED_GROUPS = frozenset({"gmail", "drive"})
 
 # Which group each tool family needs, keyed by the tool-name prefix.
+# More specific prefixes first: group_for_tool returns the first match.
 TOOL_GROUPS: dict[str, str] = {
+    "gsc_submit_": "search_write",
     "gsc_": "search",
     "ga4_": "analytics",
     "gmail_": "gmail",
@@ -154,6 +159,9 @@ class GscRestClient:
     def list_sitemaps(self, site_url: str) -> list[dict[str, Any]]:
         response = self._service.sitemaps().list(siteUrl=site_url).execute()
         return list(response.get("sitemap", []))
+
+    def submit_sitemap(self, site_url: str, feedpath: str) -> None:
+        self._service.sitemaps().submit(siteUrl=site_url, feedpath=feedpath).execute()
 
     def inspect_url(self, site_url: str, inspection_url: str) -> dict[str, Any]:
         response = (

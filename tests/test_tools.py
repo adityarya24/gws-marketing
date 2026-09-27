@@ -24,6 +24,7 @@ from gws_marketing.tools import (
     handle_list_sitemaps,
     handle_list_sites,
     handle_search_analytics,
+    handle_submit_sitemap,
 )
 
 
@@ -45,6 +46,9 @@ class FakeGscClient:
 
     def list_sitemaps(self, site_url):
         return [{"path": "sitemap.xml", "type": "sitemap", "isPending": False}]
+
+    def submit_sitemap(self, site_url, feedpath):
+        self.submitted = (site_url, feedpath)
 
     def inspect_url(self, site_url, inspection_url):
         return {
@@ -132,6 +136,16 @@ def test_list_sitemaps_and_inspect():
         inspection_url="https://example.com/free-calculators",
     )
     assert inspected["verdict"] == "NEUTRAL"
+
+
+def test_submit_sitemap_passes_the_sitemap_url():
+    client = FakeGscClient()
+    out = handle_submit_sitemap(
+        client, site_url="sc-domain:example.com",
+        sitemap_url="https://example.com/sitemap.xml",
+    )
+    assert client.submitted == ("sc-domain:example.com", "https://example.com/sitemap.xml")
+    assert out["submitted"] is True
 
 
 class FakeGa4Client:
@@ -451,6 +465,7 @@ def test_group_for_tool_maps_every_tool_family():
     from gws_marketing.gsc import group_for_tool
 
     assert group_for_tool("gsc_list_sites") == "search"
+    assert group_for_tool("gsc_submit_sitemap") == "search_write"
     assert group_for_tool("ga4_run_report") == "analytics"
     assert group_for_tool("gmail_create_draft") == "gmail"
     assert group_for_tool("gcal_list_events") == "calendar"
