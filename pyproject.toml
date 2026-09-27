@@ -36,6 +36,7 @@ dev = [
 [project.scripts]
 gws-marketing-server = "gws_marketing.server:main"
 gws-marketing-login = "gws_marketing.auth:main"
+gws-marketing-report = "gws_marketing.report:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
