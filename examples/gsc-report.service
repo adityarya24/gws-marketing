@@ -1,0 +1,7 @@
+[Unit]
+Description=Weekly Search Console report to Telegram
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/gws-marketing/gsc-jobs.env
+ExecStart=%h/gws-marketing/.venv/bin/python %h/gws-marketing/examples/gsc_telegram_jobs.py report

@@ -135,6 +135,28 @@ On macOS/Linux, use `.venv/bin/gws-marketing-server` instead.
 First run from the agent: call `auth_status`, then `auth_login` with only the
 scope groups you need (default is `search` + `analytics`).
 
+## Scheduled reports
+
+`gws-marketing-report --site sc-domain:example.com --inspect https://example.com/`
+prints a weekly Search Console summary: clicks, impressions and position against
+the previous week, top and new queries, top pages, index status for the URLs you
+name, and sitemap health.
+
+[`examples/`](examples/) has two jobs built on it for a Linux box with systemd:
+
+- `gsc_telegram_jobs.py report` sends that summary to a Telegram chat.
+- `gsc_telegram_jobs.py sitemap` resubmits your sitemap once per new commit on
+  your site's branch, after the host (Vercel, Netlify) reports the deploy as
+  successful. It needs a profile with the opt-in `search_write` group.
+
+Copy `gsc-jobs.env.example` to `~/.config/gws-marketing/gsc-jobs.env`, fill it
+in, copy the `.service` and `.timer` files to `~/.config/systemd/user/`, then run
+`systemctl --user enable --now gsc-report.timer gsc-sitemap.timer`.
+
+Google has no API for the "Request indexing" button (the Indexing API only
+covers job postings and livestreams), so a sitemap resubmit is the automated
+nudge; request indexing by hand for important pages.
+
 ## Roadmap
 
 | Next | Blocked on |

@@ -1,0 +1,7 @@
+[Unit]
+Description=Resubmit the sitemap after a new successful deploy
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/gws-marketing/gsc-jobs.env
+ExecStart=%h/gws-marketing/.venv/bin/python %h/gws-marketing/examples/gsc_telegram_jobs.py sitemap
