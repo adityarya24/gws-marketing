@@ -60,7 +60,7 @@ class FakeGscClient:
 def test_registry_integrity():
     assert set(TOOLS) == set(SCHEMAS) == set(DESCRIPTIONS)
     assert all(
-        name.startswith(("gsc_", "ga4_", "auth_", "gmail_", "gcal_", "drive_"))
+        name.startswith(("gsc_", "ga4_", "auth_", "gmail_", "gcal_", "drive_", "site_"))
         for name in TOOLS
     )
 

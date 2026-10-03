@@ -43,6 +43,7 @@ RESTRICTED_GROUPS = frozenset({"gmail", "drive"})
 
 # Which group each tool family needs, keyed by the tool-name prefix.
 # More specific prefixes first: group_for_tool returns the first match.
+# auth_ and site_ tools are deliberately absent: they need no Google scope.
 TOOL_GROUPS: dict[str, str] = {
     "gsc_submit_": "search_write",
     "gsc_": "search",

@@ -17,6 +17,7 @@ from .ga4 import MAX_METRICS as GA4_MAX_METRICS
 from .ga4 import MAX_ROW_LIMIT as GA4_MAX_ROW_LIMIT
 from .gsc import MAX_ROW_LIMIT
 from .jev import MAX_PAGES, classify_queries, load_api_key
+from .seo import DEFAULT_MAX_PAGES, MAX_PAGES_CAP, audit_site
 
 VALID_DIMENSIONS = {"date", "query", "page", "device", "country"}
 
@@ -181,6 +182,16 @@ def handle_classify_queries(client: Any, **kwargs: Any) -> dict[str, Any]:
         "queries": classified,
         "count": len(classified),
     }
+
+
+def handle_site_seo_audit(_client: Any, **kwargs: Any) -> dict[str, Any]:
+    """Audit a public site over plain HTTP; needs no Google credentials."""
+    return audit_site(
+        kwargs["url"],
+        max_pages=kwargs.get("max_pages", DEFAULT_MAX_PAGES),
+        sitemap_url=kwargs.get("sitemap_url"),
+    )
+
 
 # --- GA4 handlers ---------------------------------------------------------------
 
@@ -449,6 +460,26 @@ SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["site_url", "start_date", "end_date"],
         "additionalProperties": False,
     },
+    "site_seo_audit": {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "Site root to audit, e.g. https://example.com/ (http or https).",
+            },
+            "max_pages": {
+                "type": "integer",
+                "description": f"Sitemap pages to audit, 1-{MAX_PAGES_CAP}. Default {DEFAULT_MAX_PAGES}.",
+            },
+            "sitemap_url": {
+                "type": "string",
+                "description": "Sitemap URL. Default: the Sitemap line in robots.txt, "
+                "else <root>/sitemap.xml.",
+            },
+        },
+        "required": ["url"],
+        "additionalProperties": False,
+    },
     "gsc_classify_queries": {
         "type": "object",
         "properties": {
@@ -656,6 +687,12 @@ SCHEMAS: dict[str, dict[str, Any]] = {
 }
 
 DESCRIPTIONS: dict[str, str] = {
+    "site_seo_audit": (
+        "Audit a public site's SEO with plain HTTP GETs, no Google login: "
+        "robots.txt, sitemap, redirect chains, and per page the status, title, "
+        "meta description, canonical, H1, noindex, image alt text and size, and "
+        "JSON-LD. Returns a severity-sorted fixes list. Read-only."
+    ),
     "gsc_classify_queries": (
         "Label the top Search Console queries by search intent (brand, question, "
         "tool, purchase, other) with a confidence score, plus the best page for "
@@ -714,6 +751,7 @@ DESCRIPTIONS: dict[str, str] = {
 }
 
 TOOLS: dict[str, Callable[..., dict[str, Any]]] = {
+    "site_seo_audit": handle_site_seo_audit,
     "gsc_list_sites": handle_list_sites,
     "gsc_search_analytics": handle_search_analytics,
     "gsc_list_sitemaps": handle_list_sitemaps,

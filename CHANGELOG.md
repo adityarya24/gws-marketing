@@ -4,7 +4,17 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-03
+
 ### Added
+- `site_seo_audit`: audits a public site with read-only HTTP requests and no
+  Google login. Checks robots.txt (including an HTML 404 served as a file and
+  `Disallow: /`), the sitemap, http/https and www redirect chains, and per page
+  the status, title, meta description (counted in characters), canonical, H1,
+  noindex, image alt text, JSON-LD and og:image, plus oversized JPEG/PNG
+  images. Returns a summary and a severity-sorted `fixes` list. A page that
+  fails to load is reported as a finding, not an error. Only URLs on the
+  site's own host are audited.
 - `gsc_classify_queries`: labels the top Search Console queries by search
   intent (brand, question, tool, purchase, other) with a confidence score, and
   optionally picks the best page for each from a candidate list. Labels come

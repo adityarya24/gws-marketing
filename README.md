@@ -1,6 +1,6 @@
 # gws-marketing
 
-**v0.2.1** — Agent-facing MCP server for Google marketing data over stdio MCP,
+**v0.3.0** — Agent-facing MCP server for Google marketing data over stdio MCP,
 so local agents (OpenCode/Claude/Codex/Cursor) can query Search Console, GA4,
 Gmail, Calendar and Drive without leaving chat.
 
@@ -9,11 +9,12 @@ Sending mail is deliberately not implemented — every outbound message stays
 human-reviewed.
 
 Low-level `mcp` stdio server with explicit JSON schemas, a tool registry as the
-single source of truth, and mocked tests (82 passing).
+single source of truth, and mocked tests (113 passing).
 
 ## What's shipped
 
-- **16 MCP tools** across GSC, GA4, Gmail, Calendar, Drive, and built-in auth
+- **18 MCP tools** across GSC, GA4, Gmail, Calendar, Drive, a public-site SEO
+  audit, and built-in auth
 - **Scoped OAuth** — default consent is `search + analytics` only; Gmail and
   Drive are opt-in restricted scopes
 - **Multi-account** token profiles via optional `account` parameter
@@ -33,6 +34,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 | `gsc_inspect_url` | `search` | URL inspection (indexing status) |
 | `gsc_submit_sitemap` | `search_write` (opt-in) | Submit or resubmit a sitemap (the only Search Console write) |
 | `gsc_classify_queries` | `search` + TypeSafe key | Label top queries by search intent, with confidence and best page ([TypeSafe Jev](https://typesafe.ai)) |
+| `site_seo_audit` | none (public HTTP, no login) | Audit a site's robots.txt, sitemap, redirects and per-page SEO; returns a severity-sorted fixes list |
 | `ga4_list_properties` | `analytics` | List GA4 properties |
 | `ga4_run_report` | `analytics` | Run a GA4 report by metrics/dimensions, optionally filtered to an exact hostname |
 | `gmail_search_messages` | `gmail` | Search the mailbox |

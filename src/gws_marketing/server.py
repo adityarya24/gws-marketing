@@ -101,8 +101,9 @@ async def handle_call(name: str, arguments: dict[str, Any]) -> types.CallToolRes
         return _json_result(payload, is_error=True)
 
     try:
-        # Auth handlers manage local token storage and need no API client.
-        if name.startswith("auth_"):
+        # Auth handlers manage local token storage and need no API client;
+        # site_ tools read public pages over HTTP and need no Google client.
+        if name.startswith(("auth_", "site_")):
             client = None
         else:
             account = str(arguments.get("account") or "default")
